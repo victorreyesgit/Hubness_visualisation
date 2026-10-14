@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hubness explorer</title><link rel="stylesheet" href="style.css"></head><body>
+<header><h1>Hubness explorer</h1><span class="mut">k-occurrences of points uniform on the square [−1,1]²</span></header>
+<div class="app">
+<aside>
+  <section class="box"><h2>Parameters</h2>
+    <div class="par"><label for="nS">N <small>points</small></label><input id="nI" type="number" min="10" max="10000"><input id="nS" type="range" min="0" max="1000"></div>
+    <div class="par"><label for="kS">k <small>neighbours</small></label><input id="kI" type="number" min="1"><input id="kS" type="range" min="0" max="1000"></div>
+  </section>
+  <section class="box" id="pointBox"><h2>The point</h2>
+    <div class="seg" role="group" aria-label="Role of the point"><button data-r="c">c · reference</button><button data-r="x" class="on">x · target</button></div>
+    <p class="hint" id="hint"></p>
+    <label class="chk"><input type="checkbox" id="two"> Show <span id="twoL">c</span> as a second point</label>
+    <div class="kv"><span>position</span><b id="pos"></b></div>
+    <div class="kv"><span>O<sup>k:N</sup>(x)</span><b id="oval" class="big"></b></div>
+  </section>
+</aside>
+<main>
+  <div class="tabs"><button id="tD" class="on">Discrete experiment</button><button id="tE">Point explorer</button><button id="tO">k-occurrence map</button></div>
+  <section id="disc">
+    <div class="box"><h2>Discrete experiment <small>one random sample of N points</small></h2>
+      <p class="mut">Each point in turn (top-left to bottom-right) picks its k nearest neighbours: they turn green and their counter goes up by 1. At the end, points are coloured by their final count, the k-occurrence.</p>
+      <div class="row"><button class="btn" id="dRep">Repeat experiment</button><button class="btn ghost" id="dSkip">Skip to result</button>
+        <label>Speed <select id="spd"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></label></div>
+      <div class="mut" id="dnote"></div></div>
+    <div class="grid one" id="dgrid"></div>
+  </section>
+  <section id="explore" class="hide">
+    <div class="grid" id="grid"></div>
+    <div class="box"><h2>Empirical check <small>for the current x</small></h2>
+      <div class="row"><label>Experiments <input id="E" type="number" value="200" min="1" max="5000"></label><button class="btn" id="simB">Simulate</button></div>
+      <div id="simT" class="mut">Draws N uniform points per experiment and counts how many have x among their k nearest neighbours.</div>
+      <canvas id="hist" width="600" height="120" class="wide"></canvas></div>
+  <section class="box"><h2>Display</h2>
+    <div class="par"><label for="rS">Resolution <small id="rV">150</small></label><span></span><input id="rS" type="range" min="30" max="200" step="10" value="150"></div>
+    <label class="chk"><input type="checkbox" id="ord"> Show order 1+(N−1)·C instead of C</label>
+  </section>
+  </section>
+  <section id="omap" class="hide">
+    <p class="mut">Expected k-occurrence of every x, computed by midpoint integration over c; only 1/8 of the points are computed thanks to the square's symmetry.</p>
+    <div class="grid one" id="ogrid"></div>
+    <div class="box"><h2>Display</h2>
+      <p class="mut">Midpoint integration over c, computing only 1/8 of the points thanks to the square's symmetry.</p>
+      <div class="row"><label>Resolution <input id="oS" type="range" min="20" max="200" step="10" value="100"> <span id="oV">100</span></label><span id="oP" class="mut"></span></div></div>
+
+  </section>
+</main></div>
+<script src="script.js"></script></body></html>
