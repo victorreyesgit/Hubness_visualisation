@@ -49,7 +49,7 @@ const Nk = (p, k, N) => binCdf(k - 1, N - 1, p);
 
 // ================= STATE / UI =================
 const $ = id => document.getElementById(id), W = 440, MG = 32, SQ = W - 2 * MG;  // canvas size, margin around the square, square side
-const st = { N: 1000, k: 30, p: [0.3, 0.2], q: [-0.5, -0.4], two: false, role: 'x', res: 150, ores: 100, order: false, mode: 'explore' };
+const st = { N: 1000, k: 30, p: [0.3, 0.2], q: [-0.5, -0.4], two: false, ox: [0.3, 0.2], role: 'x', res: 150, ores: 100, order: false, mode: 'explore' };
 const fmt = v => (v === undefined || !isFinite(v)) ? '–' : v.toPrecision(3);
 const VIR = ['#440154', '#46327e', '#365c8d', '#277f8e', '#1fa187', '#4ac16d', '#9fda3a', '#fde725'];
 const MAG = ['#000004', '#251255', '#721f81', '#b63679', '#f1605d', '#fec287', '#fcfdbf'];
@@ -62,11 +62,10 @@ function cmap(stops) {
 }
 function mkPanel(parent, stops, f, isCl) {
   const el = document.createElement('div'); el.className = 'panel';
-  el.innerHTML = `<h3></h3><div class="sub"></div><canvas width="${W}" height="${W}"></canvas><div class="bar" style="background:linear-gradient(90deg,${stops.join(',')})"></div><div class="sc"><span></span><span></span></div><div class="hov">&nbsp;</div>`;
+  el.innerHTML = `<h3></h3><div class="sub"></div><div class="mw"><canvas width="${W}" height="${W}"></canvas><div class="lg"><div class="bar" style="background:linear-gradient(0deg,${stops.join(',')})"></div><span class="hi"></span><span class="lo"></span></div></div><div class="hov">&nbsp;</div>`;
   parent.appendChild(el);
-  const s = el.querySelectorAll('.sc span');
   return { f, isCl, cm: cmap(stops), cv: el.querySelector('canvas'), off: document.createElement('canvas'),
-    h: el.querySelector('h3'), sub: el.querySelector('.sub'), lo_: s[0], hi_: s[1], hov: el.querySelector('.hov') };
+    h: el.querySelector('h3'), sub: el.querySelector('.sub'), lo_: el.querySelector('.lo'), hi_: el.querySelector('.hi'), hov: el.querySelector('.hov') };
 }
 function paint(p) {
   const R = p.R; p.off.width = p.off.height = R;
@@ -86,7 +85,12 @@ function show(p, marker) {
   [[-1, '−1'], [0, '0'], [1, '1']].forEach(([v, t]) => { const X = MG + (v + 1) / 2 * SQ; g.fillText(t, X, MG + SQ + 7); g.beginPath(); g.moveTo(X, MG + SQ); g.lineTo(X, MG + SQ + 4); g.stroke(); });
   g.textAlign = 'right'; g.textBaseline = 'middle';
   [[-1, '−1'], [0, '0'], [1, '1']].forEach(([v, t]) => { const Y = MG + (1 - v) / 2 * SQ; g.fillText(t, MG - 8, Y); g.beginPath(); g.moveTo(MG, Y); g.lineTo(MG - 4, Y); g.stroke(); });
-  if (marker) drawMarkers(g);
+  if (marker === 'ox') {
+    const X = MG + (st.ox[0] + 1) / 2 * SQ, Y = MG + (1 - st.ox[1]) / 2 * SQ;
+    g.beginPath(); g.arc(X, Y, 5.5, 0, 7); g.fillStyle = '#111'; g.fill(); g.lineWidth = 2.5; g.strokeStyle = '#fff'; g.stroke();
+    g.font = 'bold 12px system-ui,sans-serif'; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.lineWidth = 3; g.strokeStyle = 'rgba(255,255,255,.9)';
+    g.strokeText('x', X + 8, Y - 5); g.fillStyle = '#111'; g.fillText('x', X + 8, Y - 5);
+  } else if (marker) drawMarkers(g);
   p.lo_.textContent = p.lo === undefined ? '' : +p.lo.toPrecision(3); p.hi_.textContent = p.hi === undefined ? '' : +p.hi.toPrecision(3);
 }
 const xPt = () => (st.role === 'x' || !st.two) ? st.p : st.q, cPt = () => st.role === 'c' ? st.p : st.q;
@@ -139,8 +143,10 @@ function refresh() {
     $('pos').innerHTML = st.two ? `x (${f2(xp)})<br>c (${f2(cp)})` : `${st.role} (${f2(st.p)})`;
     panels[0].hov.style.display = st.two ? '' : 'none';
     if (st.two) panels[0].hov.innerHTML = `<b>C(x; c) = ${C(xp[0], xp[1], cp[0], cp[1]).toFixed(4)}</b>`;
-    $('oval').textContent = st.role === 'x' ? fmt(st.N * v.reduce((a, b) => a + b, 0) / v.length)
-      : st.two ? fmt(oAt(xp[0], xp[1], Array.from({ length: 60 }, (_, i) => -1 + (i + .5) / 30))) : '–';
+    $('oval').textContent = st.role === 'x' ? fmt(st.N * v.reduce((a, b) => a + b, 0) / v.length) : '';
+    $('oRow').style.display = st.role === 'x' ? '' : 'none';
+    $('simBox').classList.toggle('hide', !(st.role === 'x' || st.two));
+    drawCdf();
   });
 }
 const toDom = e => { const r = e.target.getBoundingClientRect(), cl = t => Math.max(-1, Math.min(1, t));
@@ -161,13 +167,75 @@ panels.forEach(p => {
   p.cv.addEventListener('pointerup', () => drag = null);
 });
 
+// ================= CDFs OF THE MAP VALUES =================
+const cdfP = [0, 1].map(() => {
+  const el = document.createElement('div'); el.className = 'panel full';
+  el.innerHTML = '<h3></h3><div class="sub"></div><canvas class="wide" width="880" height="260"></canvas><div class="pval"></div>';
+  $('grid').appendChild(el); return el;
+});
+const CDF_T = {
+  c: [['CDF of closeness C(x; c) over x', 'Fraction of the square (every x) whose closeness to c is at most t.'],
+      ['CDF of N<sup>k:N</sup>(x; c) over x', 'Fraction of the square (every x) whose probability of being a k-neighbour of c is at most t.']],
+  x: [['CDF of reverse closeness C(x; c) over c', 'Fraction of the possible c whose closeness to x is at most t. The dashed diagonal is the identity F(t) = t.'],
+      ['CDF of reverse N<sup>k:N</sup>(x; c) over c', 'Fraction of the possible c whose probability that x is a k-neighbour is at most t. O(x) is N times its mean.']]
+};
+const makeCdf = a => { const n = a.length; return t => { let lo = 0, hi = n; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] <= t) lo = m + 1; else hi = m; } return lo / n; }; };
+function drawCdfPlot(i, F, colr, name, markT, ident) {
+  const el = cdfP[i]; el.querySelector('h3').innerHTML = CDF_T[st.role][i][0]; el.querySelector('.sub').innerHTML = CDF_T[st.role][i][1];
+  const cv = el.querySelector('canvas'), g = cv.getContext('2d'), Wc = 880, Hc = 260, m = { l: 58, r: 18, t: 14, b: 44 }, pw = Wc - m.l - m.r, ph = Hc - m.t - m.b;
+  const css = getComputedStyle(document.documentElement), col = k => css.getPropertyValue(k).trim();
+  const mut = col('--mut') || '#667186', line = col('--line') || '#e1e6ee', tx = col('--tx') || '#111';
+  const PX = t => m.l + t * pw, PY = f => m.t + (1 - f) * ph;
+  g.clearRect(0, 0, Wc, Hc); g.font = '13px system-ui,sans-serif'; g.lineWidth = 1;
+  for (let k = 0; k <= 4; k++) {
+    g.strokeStyle = line; g.beginPath(); g.moveTo(m.l, PY(k / 4)); g.lineTo(m.l + pw, PY(k / 4)); g.moveTo(PX(k / 4), m.t); g.lineTo(PX(k / 4), m.t + ph); g.stroke();
+    g.fillStyle = mut; g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(k / 4, m.l - 8, PY(k / 4));
+    g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(k / 4, PX(k / 4), m.t + ph + 8);
+  }
+  g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillText('value t', m.l + pw / 2, Hc - 8);
+  g.save(); g.translate(14, m.t + ph / 2); g.rotate(-Math.PI / 2); g.fillText('F(t) = fraction ≤ t', 0, 0); g.restore();
+  if (ident) { g.setLineDash([6, 5]); g.strokeStyle = mut; g.lineWidth = 1.5; g.beginPath(); g.moveTo(PX(0), PY(0)); g.lineTo(PX(1), PY(1)); g.stroke(); g.setLineDash([]); }
+  const K = 400; g.beginPath(); for (let k = 0; k <= K; k++) g[k ? 'lineTo' : 'moveTo'](PX(k / K), PY(F(k / K)));
+  g.strokeStyle = colr; g.lineWidth = 2.5; g.stroke();
+  if (markT !== undefined) {                              // current pair (x, c)
+    const f = F(markT);
+    g.setLineDash([5, 4]); g.strokeStyle = '#e5253d'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(PX(markT), PY(0)); g.lineTo(PX(markT), PY(f)); g.lineTo(PX(0), PY(f)); g.stroke(); g.setLineDash([]);
+    g.beginPath(); g.arc(PX(markT), PY(f), 4.5, 0, 7); g.fillStyle = colr; g.fill(); g.lineWidth = 2; g.strokeStyle = '#fff'; g.stroke();
+    g.fillStyle = tx; g.textAlign = markT > .6 ? 'right' : 'left'; g.textBaseline = 'bottom';
+    g.fillText(`${name} = ${markT.toFixed(3)} → F = ${f.toFixed(3)}`, PX(markT) + (markT > .6 ? -8 : 8), PY(f) - 6);
+  }
+  const items = [[name, colr, false]]; if (ident) items.push(['identity F(t) = t', mut, true]);
+  const ly = m.t + 16, lx = m.l + 12;
+  g.textAlign = 'left'; g.textBaseline = 'middle';
+  items.forEach(([t, cl, dash], k) => { const y = ly + k * 20; g.setLineDash(dash ? [6, 5] : []); g.strokeStyle = cl; g.lineWidth = 2.5; g.beginPath(); g.moveTo(lx, y); g.lineTo(lx + 24, y); g.stroke(); g.setLineDash([]); g.fillStyle = tx; g.fillText(t, lx + 32, y); });
+}
+function drawCdf() {
+  const xp = xPt(), cp = cPt(), cv = st.two ? C(xp[0], xp[1], cp[0], cp[1]) : undefined, nv = st.two ? Nk(cv, st.k, st.N) : undefined;
+  const css = getComputedStyle(document.documentElement), C1 = css.getPropertyValue('--ac').trim() || '#21908d', C2 = '#7e57c2';
+  const cArr = Float32Array.from(panels[0].v, t => st.order ? (t - 1) / (st.N - 1) : t).sort();   // raw closeness, even in the order view
+  const F1 = makeCdf(cArr), F2 = makeCdf(Float32Array.from(panels[1].v).sort());
+  drawCdfPlot(0, F1, C1, 'closeness', cv, st.role === 'x');
+  drawCdfPlot(1, F2, C2, 'N k:N', nv, false);
+  // probabilities under each plot: P(C < k/N) and P(N^{k:N} < 0.5)
+  const thr = st.k / st.N;
+  cdfP[0].querySelector('.pval').innerHTML = `P(<i>C</i> &lt; <i>k</i>/<i>N</i> = ${+thr.toPrecision(3)}) = <b>${F1(thr).toFixed(3)}</b>`;
+  cdfP[1].querySelector('.pval').innerHTML = `P(<i>N</i><sup><i>k</i>:<i>N</i></sup> &gt; 0.5) = <b>${(1 - F2(0.5)).toFixed(3)}</b>`;
+}
+
 // ================= k-OCCURRENCE MAP (all x) =================
 const op = mkPanel($('ogrid'), VIR, null, 0);
-op.h.innerHTML = 'Expected k-occurrence O<sup>k:N</sup>(x)'; op.sub.textContent = 'Expected number of times each x appears in the k-neighbourhood of the other points.';
-op.cv.addEventListener('pointermove', e => hover(op, e));
-op.cv.addEventListener('pointerleave', () => op.hov.innerHTML = '&nbsp;');
+op.h.innerHTML = 'Expected k-occurrence O<sup>k:N</sup>(x)'; 
+op.sub.textContent = 'Expected number of times each x is chosen as a neighbour. Tap or drag on the map to place x and read O(x) below.';
+op.hov.classList.add('val');
+const csO = Array.from({ length: 60 }, (_, i) => -1 + (i + .5) / 30);
+function updateOx() { op.hov.innerHTML = `<b>O(x) = ${fmt(oAt(st.ox[0], st.ox[1], csO))}</b> &nbsp;at x = (${st.ox.map(t => t.toFixed(2)).join(', ')})`; }
+let dragO = false; const moveO = e => { st.ox = toDom(e); updateOx(); show(op, 'ox'); };
+op.cv.addEventListener('pointerdown', e => { dragO = true; op.cv.setPointerCapture(e.pointerId); moveO(e); });
+op.cv.addEventListener('pointermove', e => { if (dragO) moveO(e); });
+op.cv.addEventListener('pointerup', () => dragO = false);
 let job = 0;
 function startO() {
+  updateOx();
   const id = ++job, R = st.ores, H = Math.ceil(R / 2), M = R, h = 2 / R;
   const cs = Array.from({ length: M }, (_, i) => -1 + (i + .5) * 2 / M), Vf = new Float32Array(H * H).fill(NaN), tasks = [];
   for (let a = 0; a < H; a++) for (let b = a; b < H; b++) tasks.push([a, b]);
@@ -184,7 +252,7 @@ function startO() {
       const fi = Math.min(i, R - 1 - i), fj = Math.min(j, R - 1 - j);
       v[j * R + i] = Vf[Math.min(fi, fj) * H + Math.max(fi, fj)];
     }
-    Object.assign(op, { v, lo, hi, R }); paint(op); show(op, false);
+    Object.assign(op, { v, lo, hi, R }); paint(op); show(op, 'ox');
     $('oP').textContent = n < tasks.length ? `computing… ${Math.round(100 * n / tasks.length)}%` : 'done';
     if (n < tasks.length) requestAnimationFrame(step);
   })();
@@ -230,9 +298,161 @@ $('simB').onclick = () => {
   })();
 };
 
+// ================= INTRO DIAGRAM (closeness ball) =================
+(function () {
+// ---------- settings you may want to tweak ----------
+const L = 3.6;                    // plot covers [-L, L] in both axes
+const SX = 1.2, SY = 0.9;         // sigma_x, sigma_y of the Gaussian
+const C = { x: -1.0, y: -0.7 };   // center c (red)
+const X = { x: 0.5, y: 0.4 };     // point x (black)
+const N_POINTS = 45;              // schematic sample points
+const SIZE = 640;                 // CSS pixels
+
+const canvas = document.getElementById('ic');
+const ctx = canvas.getContext('2d');
+const dpr = Math.min(window.devicePixelRatio || 1, 3);
+canvas.width = SIZE * dpr;
+canvas.height = SIZE * dpr;
+
+let dark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+let showPoints = true;
+
+// ---------- helpers ----------
+const toPx = (x, y) => [(x + L) / (2 * L) * SIZE, (L - y) / (2 * L) * SIZE];
+const f = (x, y) => Math.exp(-0.5 * ((x / SX) ** 2 + (y / SY) ** 2));
+const r = Math.hypot(X.x - C.x, X.y - C.y);          // world units
+const rPx = r / (2 * L) * SIZE;
+
+// seeded random so the picture is always the same
+function rng(seed) {
+  return () => {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = rng(7);
+const gauss = () => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
+const points = Array.from({ length: N_POINTS }, () => ({ x: gauss() * SX, y: gauss() * SY }));
+
+// viridis-like ramp
+const RAMP = [[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]];
+function ramp(t) {
+  const p = t * (RAMP.length - 1), i = Math.min(Math.floor(p), RAMP.length - 2), u = p - i;
+  return RAMP[i].map((v, k) => v + (RAMP[i + 1][k] - v) * u);
+}
+
+// heatmap drawn once at low resolution, then stretched
+function makeHeat() {
+  const n = 160, off = document.createElement('canvas');
+  off.width = off.height = n;
+  const o = off.getContext('2d'), img = o.createImageData(n, n);
+  const bg = dark ? [13, 14, 18] : [255, 255, 255];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const x = -L + (i + 0.5) / n * 2 * L, y = L - (j + 0.5) / n * 2 * L;
+    const t = Math.pow(f(x, y), 0.6);                  // gamma boost, as in the explorer
+    const col = ramp(t), a = dark ? Math.min(1, t * 1.6) : Math.min(1, t * 1.3);
+    const k = 4 * (j * n + i);
+    for (let m = 0; m < 3; m++) img.data[k + m] = bg[m] + (col[m] - bg[m]) * a;
+    img.data[k + 3] = 255;
+  }
+  o.putImageData(img, 0, 0);
+  return off;
+}
+
+// LaTeX-style text: parts = [{s, it, sup, sub}], drawn left to right
+const MATH = 'KaTeX_Math, "Latin Modern Math", "STIX Two Text", "Times New Roman", serif';
+const MAIN = 'KaTeX_Main, "Latin Modern Roman", "Times New Roman", serif';
+function tex(parts, cx, cy, size, color, halo, align = 'center') {
+  const w = parts.map(p => {
+    ctx.font = (p.it ? 'italic ' : '') + (p.sup || p.sub ? size * 0.7 : size) + 'px ' + (p.it ? MATH : MAIN);
+    return ctx.measureText(p.s).width;
+  });
+  const total = w.reduce((a, b) => a + b, 0);
+  let x = align === 'center' ? cx - total / 2 : cx;
+  ctx.textBaseline = 'alphabetic';
+  parts.forEach((p, i) => {
+    const sz = p.sup || p.sub ? size * 0.7 : size;
+    const y = cy + size * 0.35 + (p.sup ? -size * 0.4 : p.sub ? size * 0.2 : 0);
+    ctx.font = (p.it ? 'italic ' : '') + sz + 'px ' + (p.it ? MATH : MAIN);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 5; ctx.strokeStyle = halo; ctx.strokeText(p.s, x, y);
+    ctx.fillStyle = p.color || color; ctx.fillText(p.s, x, y);
+    x += w[i];
+  });
+}
+
+// ---------- main drawing ----------
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const bg = dark ? '#0d0e12' : '#ffffff';
+  const fg = dark ? '#e7e9ee' : '#111111';
+  const purple = dark ? '#b980ff' : '#7b2fd6';
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, SIZE, SIZE);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(makeHeat(), 0, 0, SIZE, SIZE);
+
+  const [cx, cy] = toPx(C.x, C.y), [xx, xy] = toPx(X.x, X.y);
+
+  // ball B^c(r): light fill + solid outline
+  ctx.beginPath(); ctx.arc(cx, cy, rPx, 0, 2 * Math.PI);
+  ctx.fillStyle = dark ? 'rgba(185,128,255,0.14)' : 'rgba(123,47,214,0.12)'; ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = purple; ctx.stroke();
+
+  // sample points
+  if (showPoints) for (const p of points) {
+    const [px, py] = toPx(p.x, p.y);
+    ctx.beginPath(); ctx.arc(px, py, 3.2, 0, 2 * Math.PI);
+    ctx.fillStyle = dark ? 'rgba(200,204,214,0.85)' : 'rgba(60,64,76,0.75)'; ctx.fill();
+  }
+
+  // radius segment c -> x (dashed)
+  ctx.setLineDash([7, 5]); ctx.lineWidth = 2.2; ctx.strokeStyle = fg;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(xx, xy); ctx.stroke(); ctx.setLineDash([]);
+
+  // c (red) and x (black with white outline so it shows on dark too)
+  ctx.beginPath(); ctx.arc(cx, cy, 7, 0, 2 * Math.PI);
+  ctx.fillStyle = '#ff2d2d'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(xx, xy, 7, 0, 2 * Math.PI);
+  ctx.fillStyle = '#000'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+
+  // ---- labels ----
+  const halo = dark ? 'rgba(13,14,18,0.85)' : 'rgba(255,255,255,0.9)';
+  tex([{ s: 'c', it: true }], cx - 18, cy + 20, 30, '#ff2d2d', halo);
+  tex([{ s: 'x', it: true }], xx + 20, xy - 18, 30, fg, halo);
+
+  // r: midpoint of the segment, pushed to the side
+  const dx = xx - cx, dy = xy - cy, len = Math.hypot(dx, dy);
+  let nx = -dy / len, ny = dx / len;
+  if (ny > 0) { nx = -nx; ny = -ny; }                  // push upward
+  tex([{ s: 'r', it: true }], (cx + xx) / 2 + nx * 20, (cy + xy) / 2 + ny * 20, 30, fg, halo);
+
+  // B^c(r) on the circle, upper-left
+  const a = -2.35;                                      // radians, screen coords
+  tex([{ s: 'B', it: true }, { s: 'c', it: true, sup: true }, { s: '(' }, { s: 'r', it: true }, { s: ')' }],
+      cx + Math.cos(a) * (rPx + 38), cy + Math.sin(a) * (rPx + 30), 30, purple, halo);
+
+  // f_X : density label, top right
+  tex([{ s: 'f', it: true }, { s: 'X', it: true, sub: true }], SIZE - 70, 52, 34,
+      dark ? '#5ec964' : '#1f7a2e', halo);
+}
+
+draw();
+
+document.getElementById('iTheme').onclick = () => { dark = !dark; draw(); };
+document.getElementById('iPts').onclick = () => { showPoints = !showPoints; draw(); };
+document.getElementById('iPng').onclick = () => {
+  const a = document.createElement('a');
+  a.download = 'closeness-ball.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+};
+})();
+
 // ================= DISCRETE EXPERIMENT =================
-const dp = mkPanel($('dgrid'), VIR, null, 0), dbar = dp.cv.parentElement.querySelector('.bar'), dsc = dp.cv.parentElement.querySelector('.sc');
-dp.h.textContent = 'Counters start at 0';
+const dp = mkPanel($('dgrid'), VIR, null, 0), dbar = dp.cv.parentElement.querySelector('.lg'), dsc = dbar;
+dp.h.textContent = 'Counters start at 0'; dp.hov.style.display = 'none';
 let disc = null; st.spd = 1;
 // seconds per point: 1st slow, 2nd faster, 3rd faster, then quick enough that the whole run stays under ~25 s
 const dur = (pos, d) => d.skip ? 0 : (pos === 0 ? 5 : pos === 1 ? 2 : pos === 2 ? 1 : Math.min(0.5, 17 / Math.max(1, d.N - 3))) / st.spd;
@@ -306,12 +526,117 @@ $('dRep').onclick = startDisc;
 $('dSkip').onclick = () => { if (disc && !disc.done) { disc.skip = true; discLoop(); } };
 $('spd').onchange = e => st.spd = +e.target.value;
 
+// ================= HUBNESS EXPLORER (uniform ball in D dimensions, x = origin) =================
+// Closeness of the origin to c with |c| = s: lens of the ball around c (radius s) and the unit ball.
+function capFrac(r, h, D) {                       // fraction of an r-ball beyond a plane at height h from its pole
+  if (h <= 0) return 0; if (h >= 2 * r) return 1;
+  if (h > r) return 1 - capFrac(r, 2 * r - h, D);
+  return 0.5 * betai(h * (2 * r - h) / (r * r), (D + 1) / 2, 0.5);
+}
+function closeOrigin(s, D) {
+  if (s <= 0.5) return Math.pow(s, D);            // the small ball lies inside the unit ball
+  const a = 1 / (2 * s);                          // radical plane, distance from the origin
+  return capFrac(1, 1 - a, D) + Math.pow(s, D) * capFrac(s, a, D);
+}
+const HM = 400, hubCache = { D: 0, cs: null, w: null }, hub = { D: 2 };
+function hubNodes(D) {                            // quadrature in s with radial density D s^(D-1)
+  if (hubCache.D !== D) {
+    const cs = new Float64Array(HM), w = new Float64Array(HM);
+    for (let i = 0; i < HM; i++) { const s = (i + .5) / HM; cs[i] = closeOrigin(s, D); w[i] = D * Math.pow(s, D - 1) / HM; }
+    Object.assign(hubCache, { D, cs, w });
+  }
+  return hubCache;
+}
+function Oorigin(N, k, D) {                       // O(0) = N * integral over s of N^{k:N}(s) D s^(D-1) ds
+  const { cs, w } = hubNodes(D); let sum = 0;
+  for (let i = 0; i < HM; i++) sum += w[i] * Nk(cs[i], k, N);
+  return N * sum;
+}
+const NG = 40, KG = 40, hmVals = new Float32Array(NG * KG), Ngrid = i => Math.round(10 * Math.pow(1000, i / (NG - 1))), Kgrid = j => Math.max(1, Math.round(Math.pow(10, 3 * j / (KG - 1))));
+let hubMapD = null, hmJob = 0;
+function paintHubMap(done) {
+  const cv = $('hc2'), g = cv.getContext('2d'), Wc = cv.width, Hc = cv.height, m = { l: 64, r: 96, t: 14, b: 50 };
+  const pw = Wc - m.l - m.r, ph = Hc - m.t - m.b, css = getComputedStyle(document.documentElement), col = k => css.getPropertyValue(k).trim();
+  const mut = col('--mut') || '#667186', tx = col('--tx') || '#111', field = col('--field') || '#f5f7fa';
+  let lo = Infinity, hi = -Infinity; for (const v of hmVals) if (v === v) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (!isFinite(lo)) { lo = 0; hi = 1; }
+  const cm = cmap(VIR), cw = pw / NG, ch = ph / KG;
+  g.clearRect(0, 0, Wc, Hc); g.fillStyle = field; g.fillRect(m.l, m.t, pw, ph);
+  for (let j = 0; j < KG; j++) for (let i = 0; i < NG; i++) {
+    const v = hmVals[j * NG + i]; if (v !== v) continue;
+    g.fillStyle = 'rgb(' + cm((v - lo) / ((hi - lo) || 1)).map(Math.round).join(',') + ')';
+    g.fillRect(m.l + i * cw, m.t + (KG - 1 - j) * ch, cw + .5, ch + .5);
+  }
+  const XN = N => m.l + (Math.log10(N) - 1) / 3 * pw, YK = k => m.t + (1 - Math.log10(k) / 3) * ph;
+  g.font = '12px system-ui,sans-serif'; g.fillStyle = mut; g.strokeStyle = mut; g.lineWidth = 1;
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  [10, 100, 1000, 10000].forEach(N => { g.fillText(N, XN(N), m.t + ph + 8); g.beginPath(); g.moveTo(XN(N), m.t + ph); g.lineTo(XN(N), m.t + ph + 4); g.stroke(); });
+  g.textAlign = 'center'; g.fillText('N', m.l + pw / 2, Hc - 14);
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  [1, 10, 100, 1000].forEach(k => { g.fillText(k, m.l - 8, YK(k)); g.beginPath(); g.moveTo(m.l, YK(k)); g.lineTo(m.l - 4, YK(k)); g.stroke(); });
+  g.save(); g.translate(14, m.t + ph / 2); g.rotate(-Math.PI / 2); g.textAlign = 'center'; g.fillText('k', 0, 0); g.restore();
+  g.strokeStyle = mut; g.strokeRect(m.l, m.t, pw, ph);
+  const bx = m.l + pw + 30, bw = 16, grad = g.createLinearGradient(0, m.t + ph, 0, m.t);
+  VIR.forEach((c, i) => grad.addColorStop(i / (VIR.length - 1), c));
+  g.fillStyle = grad; g.fillRect(bx, m.t, bw, ph); g.strokeStyle = mut; g.strokeRect(bx, m.t, bw, ph);
+  g.fillStyle = tx; g.textAlign = 'left'; g.textBaseline = 'top'; g.fillText(+hi.toPrecision(3), bx + bw + 6, m.t - 2); g.textBaseline = 'bottom'; g.fillText(+lo.toPrecision(3), bx + bw + 6, m.t + ph + 2);
+  const X = XN(st.N), Y = YK(Math.min(st.k, st.N));
+  g.beginPath(); g.arc(X, Y, 6, 0, 7); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#111'; g.stroke();
+  $('hcP').textContent = done ? `O(0) for D = ${hub.D}; colour = k-occurrence of the origin (autoscaled)` : 'computing…';
+}
+function drawHubMap() {
+  const id = ++hmJob, D = hub.D; hubMapD = D; hmVals.fill(NaN); let n = 0; const total = NG * KG;
+  (function step() {
+    if (id !== hmJob) return;
+    const t0 = performance.now();
+    while (n < total && performance.now() - t0 < 12) {
+      const i = n % NG, j = Math.floor(n / NG); n++;
+      const N = Ngrid(i), k = Kgrid(j);
+      if (k <= N) hmVals[j * NG + i] = Oorigin(N, k, D);
+    }
+    paintHubMap(n >= total);
+    if (n < total) requestAnimationFrame(step);
+  })();
+}
+function lineChart(cv, xs, ys, xmin, xmax, ymax, refY, refLabel, xTicks, xLabel, yLabel, dotX) {
+  const g = cv.getContext('2d'), Wc = cv.width, Hc = cv.height, m = { l: 64, r: 24, t: 14, b: 40 }, pw = Wc - m.l - m.r, ph = Hc - m.t - m.b;
+  const css = getComputedStyle(document.documentElement), col = k => css.getPropertyValue(k).trim();
+  const mut = col('--mut') || '#667186', line = col('--line') || '#e1e6ee', tx = col('--tx') || '#111', ac = col('--ac') || '#21908d';
+  const X = v => m.l + (v - xmin) / (xmax - xmin) * pw, Y = v => m.t + (1 - v / ymax) * ph;
+  g.clearRect(0, 0, Wc, Hc); g.font = '12px system-ui,sans-serif';
+  g.strokeStyle = line; g.lineWidth = 1; g.fillStyle = mut;
+  for (let i = 0; i <= 4; i++) { const v = ymax * i / 4; g.beginPath(); g.moveTo(m.l, Y(v)); g.lineTo(m.l + pw, Y(v)); g.stroke(); g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(+v.toPrecision(3), m.l - 8, Y(v)); }
+  g.textAlign = 'center'; g.textBaseline = 'top'; xTicks.forEach(v => g.fillText(v, X(v), m.t + ph + 8));
+  g.fillText(xLabel, m.l + pw / 2, Hc - 14);
+  g.save(); g.translate(14, m.t + ph / 2); g.rotate(-Math.PI / 2); g.textBaseline = 'middle'; g.fillText(yLabel, 0, 0); g.restore();
+  if (refY !== undefined) { g.setLineDash([6, 5]); g.strokeStyle = mut; g.lineWidth = 1.5; g.beginPath(); g.moveTo(m.l, Y(refY)); g.lineTo(m.l + pw, Y(refY)); g.stroke(); g.setLineDash([]); g.fillStyle = mut; g.textAlign = 'right'; g.textBaseline = 'bottom'; g.fillText(refLabel, m.l + pw, Y(refY) - 4); }
+  g.beginPath(); xs.forEach((v, i) => g[i ? 'lineTo' : 'moveTo'](X(v), Y(ys[i]))); g.strokeStyle = ac; g.lineWidth = 2.5; g.stroke();
+  if (dotX !== undefined) { const i = xs.indexOf(dotX); g.beginPath(); g.arc(X(xs[i]), Y(ys[i]), 5.5, 0, 7); g.fillStyle = '#e5253d'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#fff'; g.stroke(); }
+}
+function drawHubD() {
+  const k = Math.min(st.k, st.N), Ds = Array.from({ length: 20 }, (_, i) => i + 1), ys = Ds.map(D => Oorigin(st.N, k, D));
+  lineChart($('hc1'), Ds, ys, 1, 20, Math.max(k, ...ys) * 1.1, k, 'k', [1, 5, 10, 15, 20], 'dimension D', 'O(0)', hub.D);
+}
+function drawHubK() {
+  const N = st.N, K = Math.min(N, 300), ks = Array.from({ length: K }, (_, i) => i + 1), ys = ks.map(k => Oorigin(N, k, hub.D) / k);
+  lineChart($('hc3'), ks, ys, 1, Math.max(K, 2), Math.max(1.2, ...ys) * 1.1, 1, 'O/k = 1', [1, Math.round(K / 4), Math.round(K / 2), Math.round(3 * K / 4), K].filter((v, i, a) => a.indexOf(v) === i), 'k', 'O(0) / k');
+}
+function hubRefresh(redrawMap) {
+  const k = Math.min(st.k, st.N), O = Oorigin(st.N, k, hub.D);
+  $('hO').textContent = fmt(O); $('hOk').textContent = (O / k).toFixed(3);
+  $('hDn').value = hub.D; $('hDs').value = Math.min(20, hub.D);
+  drawHubD(); drawHubK();
+  if (redrawMap || hubMapD !== hub.D) drawHubMap();
+}
+$('hDn').oninput = e => { hub.D = Math.max(1, Math.min(50, Math.round(+e.target.value) || 1)); hubRefresh(true); };
+$('hDs').oninput = e => { hub.D = +e.target.value; hubRefresh(true); };
+
 // ================= CONTROLS =================
 function syncUI() {
   $('nS').value = Math.log(st.N / 10) / Math.log(1000) * 1000; $('nI').value = st.N;
   $('kS').value = Math.log(st.k) / Math.log(st.N) * 1000; $('kI').value = st.k; $('kI').max = st.N;
 }
-function paramsChanged() { syncUI(); resetSim(); st.mode === 'explore' ? refresh() : st.mode === 'omap' ? startO() : startDisc(); }
+function paramsChanged() { syncUI(); resetSim(); st.mode === 'explore' ? refresh() : st.mode === 'omap' ? startO() : st.mode === 'hub' ? hubRefresh(false) : st.mode === 'disc' ? startDisc() : null; }
 const setN = n => { st.N = Math.max(10, Math.min(10000, Math.round(n) || 10)); st.k = Math.min(st.k, st.N); paramsChanged(); };
 const setK = k => { st.k = Math.max(1, Math.min(st.N, Math.round(k) || 1)); paramsChanged(); };
 $('nS').oninput = e => setN(10 * Math.pow(1000, e.target.value / 1000));
@@ -326,12 +651,15 @@ document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
 });
 function mode(m) {
   st.mode = m;
-  [['disc', 'tD'], ['explore', 'tE'], ['omap', 'tO']].forEach(([s, t]) => { $(s).classList.toggle('hide', s !== m); $(t).classList.toggle('on', s === m); });
-  $('pointBox').classList.toggle('hide', m !== 'explore');
+  [['intro', 'tI'], ['disc', 'tD'], ['explore', 'tE'], ['omap', 'tO'], ['hub', 'tH']].forEach(([s, t]) => { $(s).classList.toggle('hide', s !== m); $(t).classList.toggle('on', s === m); });
+  $('side').classList.toggle('hide', m === 'intro'); document.querySelector('.app').classList.toggle('solo', m === 'intro');
   if (m === 'explore') refresh();
   else if (m === 'omap') startO();
+  else if (m === 'hub') hubRefresh(false);
+  else if (m === 'intro') return;
   else if (!disc || disc.key !== st.N + '-' + st.k) startDisc();
   else { disc.t0 = performance.now(); drawDisc(disc); discLoop(); }
 }
-$('tD').onclick = () => mode('disc'); $('tE').onclick = () => mode('explore'); $('tO').onclick = () => mode('omap');
-syncUI(); mode('disc');
+$('tI').onclick = () => mode('intro'); $('tD').onclick = () => mode('disc'); $('tE').onclick = () => mode('explore'); $('tO').onclick = () => mode('omap'); $('tH').onclick = () => mode('hub');
+$('goD').onclick = () => mode('disc');
+syncUI(); mode('intro');

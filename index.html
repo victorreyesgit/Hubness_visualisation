@@ -4,22 +4,28 @@
 <title>Hubness explorer</title><link rel="stylesheet" href="style.css"></head><body>
 <header><h1>Hubness explorer</h1><span class="mut">k-occurrences of points uniform on the square [−1,1]²</span></header>
 <div class="app">
-<aside>
+<aside id="side">
   <section class="box"><h2>Parameters</h2>
     <div class="par"><label for="nS">N <small>points</small></label><input id="nI" type="number" min="10" max="10000"><input id="nS" type="range" min="0" max="1000"></div>
     <div class="par"><label for="kS">k <small>neighbours</small></label><input id="kI" type="number" min="1"><input id="kS" type="range" min="0" max="1000"></div>
   </section>
-  <section class="box" id="pointBox"><h2>The point</h2>
-    <div class="seg" role="group" aria-label="Role of the point"><button data-r="c">c · reference</button><button data-r="x" class="on">x · target</button></div>
-    <p class="hint" id="hint"></p>
-    <label class="chk"><input type="checkbox" id="two"> Show <span id="twoL">c</span> as a second point</label>
-    <div class="kv"><span>position</span><b id="pos"></b></div>
-    <div class="kv"><span>O<sup>k:N</sup>(x)</span><b id="oval" class="big"></b></div>
-  </section>
 </aside>
 <main>
-  <div class="tabs"><button id="tD" class="on">Discrete experiment</button><button id="tE">Point explorer</button><button id="tO">k-occurrence map</button></div>
-  <section id="disc">
+  <div class="tabs"><button id="tI" class="on">Intro</button><button id="tD">Discrete experiment</button><button id="tE">Point explorer</button><button id="tO">k-occurrence map</button><button id="tH">Hubness explorer</button></div>
+  <section id="intro">
+    <div class="box intro"><h2>Hubness explained by closeness</h2>
+      <canvas id="ic" class="diag"></canvas>
+      <div class="row"><button class="btn ghost" id="iTheme">Dark / Light</button><button class="btn ghost" id="iPts">Points on/off</button><button class="btn ghost" id="iPng">Save PNG</button></div>
+      <p>Take two points, <i>c</i> (red) and <i>x</i> (black), and the ball around <i>c</i> whose radius reaches <i>x</i>. The ball's probability mass is the <b>closeness</b> of <i>x</i> to <i>c</i>. A point is a <b>hub</b> when it is close to few points, so it is picked as a neighbour often, and an <b>anti-hub</b> when it is picked rarely.</p>
+      <h2 class="sum">Summary: neighbourhood model</h2>
+      <div class="item"><div class="lab">Closeness of <i>x</i> to a reference point <i>c</i></div><div class="eq"><math display="block"><mi>C</mi><mo>(</mo><mi>x</mi><mo>;</mo><mi>c</mi><mo>)</mo><mo>=</mo><msub><mo>∫</mo><mrow><msup><mi>B</mi><mi>c</mi></msup><mo>(</mo><msub><mi>r</mi><mrow><mi>x</mi><mi>c</mi></mrow></msub><mo>)</mo></mrow></msub><msub><mi>f</mi><mi>X</mi></msub><mo>(</mo><mi>y</mi><mo>)</mo><mi>d</mi><mi>y</mi></math></div></div>
+      <div class="item"><div class="lab">Probability that <i>x</i> is among the <i>k</i> nearest neighbours of <i>c</i></div><div class="eq"><math display="block"><msup><mi>N</mi><mrow><mi>k</mi><mo>:</mo><mi>N</mi></mrow></msup><mo>(</mo><mi>x</mi><mo>;</mo><mi>c</mi><mo>)</mo><mo>=</mo><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>k</mi></munderover><mo>(</mo><mfrac linethickness="0"><mrow><mi>N</mi><mo>−</mo><mn>1</mn></mrow><mrow><mi>i</mi><mo>−</mo><mn>1</mn></mrow></mfrac><mo>)</mo><msup><mi>C</mi><mrow><mi>i</mi><mo>−</mo><mn>1</mn></mrow></msup><msup><mrow><mo>(</mo><mn>1</mn><mo>−</mo><mi>C</mi><mo>)</mo></mrow><mrow><mi>N</mi><mo>−</mo><mi>i</mi></mrow></msup></math></div></div>
+      <div class="item"><div class="lab">Expected <i>k</i>-occurrences of <i>x</i></div><div class="eq"><math display="block"><msup><mi>O</mi><mrow><mi>k</mi><mo>:</mo><mi>N</mi></mrow></msup><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mi>N</mi><msub><mo>∫</mo><msup><mi>ℝ</mi><mi>D</mi></msup></msub><msup><mi>N</mi><mrow><mi>k</mi><mo>:</mo><mi>N</mi></mrow></msup><mo>(</mo><mi>x</mi><mo>;</mo><mi>c</mi><mo>)</mo><msub><mi>f</mi><mi>X</mi></msub><mo>(</mo><mi>c</mi><mo>)</mo><mi>d</mi><mi>c</mi><mo>=</mo><mi>N</mi><msub><mi>E</mi><mi>c</mi></msub><mo>[</mo><msup><mi>N</mi><mrow><mi>k</mi><mo>:</mo><mi>N</mi></mrow></msup><mo>(</mo><mi>x</mi><mo>;</mo><mi>c</mi><mo>)</mo><mo>]</mo></math></div></div>
+      <p class="mut">Here <i>C</i> = <i>C</i>(<i>x</i>;<i>c</i>), <i>B</i><sup><i>c</i></sup>(<i>r</i><sub><i>xc</i></sub>) is the ball centred at <i>c</i> with radius <i>r</i><sub><i>xc</i></sub> = ‖<i>x</i> − <i>c</i>‖, and <i>f<sub>X</sub></i> is the density. In the explorer <i>D</i> = 2 and <i>f<sub>X</sub></i> is uniform on [−1, 1]², so <i>f<sub>X</sub></i> = 1/4.</p>
+      <div class="row"><button class="btn" id="goD">Start with the discrete experiment →</button></div>
+    </div>
+  </section>
+  <section id="disc" class="hide">
     <div class="box"><h2>Discrete experiment <small>one random sample of N points</small></h2>
       <p class="mut">Each point in turn (top-left to bottom-right) picks its k nearest neighbours: they turn green and their counter goes up by 1. At the end, points are coloured by their final count, the k-occurrence.</p>
       <div class="row"><button class="btn" id="dRep">Repeat experiment</button><button class="btn ghost" id="dSkip">Skip to result</button>
@@ -28,8 +34,15 @@
     <div class="grid one" id="dgrid"></div>
   </section>
   <section id="explore" class="hide">
+    <div class="box rolebar">
+      <div class="seg" role="group" aria-label="Role of the point"><button data-r="c">c · reference</button><button data-r="x" class="on">x · target</button></div>
+      <label class="chk"><input type="checkbox" id="two"> Show <span id="twoL">c</span> as a second point</label>
+      <p class="hint" id="hint"></p>
+      <div class="kv"><span>position</span><b id="pos"></b></div>
+      <div class="kv" id="oRow"><span>O<sup>k:N</sup>(x)</span><b id="oval" class="big"></b></div>
+    </div>
     <div class="grid" id="grid"></div>
-    <div class="box"><h2>Empirical check <small>for the current x</small></h2>
+    <div class="box" id="simBox"><h2>Empirical check <small>for the current x</small></h2>
       <div class="row"><label>Experiments <input id="E" type="number" value="200" min="1" max="5000"></label><button class="btn" id="simB">Simulate</button></div>
       <div id="simT" class="mut">Draws N uniform points per experiment and counts how many have x among their k nearest neighbours.</div>
       <canvas id="hist" width="600" height="120" class="wide"></canvas></div>
@@ -45,6 +58,19 @@
       <p class="mut">Midpoint integration over c, computing only 1/8 of the points thanks to the square's symmetry.</p>
       <div class="row"><label>Resolution <input id="oS" type="range" min="20" max="200" step="10" value="100"> <span id="oV">100</span></label><span id="oP" class="mut"></span></div></div>
 
+  </section>
+  <section id="hub" class="hide">
+    <div class="box">
+      <h2>Hubness explorer <small>uniform ball in D dimensions · x = origin</small></h2>
+      <p class="mut">By rotational symmetry the closeness of the origin to <i>c</i> depends only on <i>s</i> = ‖<i>c</i>‖. So the expectation over <i>c</i> reduces to one integral in <i>s</i>, with radial density <i>D s</i><sup><i>D</i>−1</sup>:</p>
+      <div class="eq"><math display="block"><msup><mi>O</mi><mrow><mi>k</mi><mo>:</mo><mi>N</mi></mrow></msup><mo>(</mo><mn>0</mn><mo>)</mo><mo>=</mo><mi>N</mi><msubsup><mo>∫</mo><mn>0</mn><mn>1</mn></msubsup><msup><mi>N</mi><mrow><mi>k</mi><mo>:</mo><mi>N</mi></mrow></msup><mo>(</mo><mi>s</mi><mo>)</mo><mi>D</mi><msup><mi>s</mi><mrow><mi>D</mi><mo>−</mo><mn>1</mn></mrow></msup><mi>d</mi><mi>s</mi><mo>,</mo><mspace width="1em"/><mi>s</mi><mo>=</mo><mo>‖</mo><mi>c</mi><mo>‖</mo></math></div>
+      <p class="mut">The closeness of the origin is <i>s</i><sup><i>D</i></sup> for <i>s</i> ≤ ½. For larger <i>s</i> it is the lens where the ball around <i>c</i> meets the unit ball, divided by the unit-ball volume, computed with the regularised incomplete beta function. N and k come from the sidebar.</p>
+      <div class="row"><label>Dimension D <input id="hDn" type="number" min="1" max="50" value="2" style="width:80px"></label><input id="hDs" type="range" min="1" max="20" value="2" style="flex:1"></div>
+      <div class="row"><span>O(0) = <b class="big" id="hO"></b></span><span>O/k = <b id="hOk"></b></span></div>
+    </div>
+    <div class="box"><h3>Expected k-occurrence of the origin against D</h3><p class="mut">At the current N and k. The dashed line is k, the average k-occurrence over all points. The red dot is the current D.</p><canvas id="hc1" class="wide" width="880" height="280"></canvas></div>
+    <div class="box"><h3>k-occurrence map of the origin over (N, k)</h3><p class="mut">At the current D. Blank cells have k &gt; N. The white dot is the current N and k.</p><canvas id="hc2" class="wide" width="880" height="420"></canvas><div class="mut" id="hcP"></div></div>
+    <div class="box"><h3>Normalised k-occurrence O/k against k</h3><p class="mut">At the current D and N. The dashed line is O/k = 1, the uniform value.</p><canvas id="hc3" class="wide" width="880" height="280"></canvas></div>
   </section>
 </main></div>
 <script src="script.js"></script></body></html>
