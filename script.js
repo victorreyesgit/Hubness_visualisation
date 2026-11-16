@@ -123,9 +123,9 @@ function compute(p) {
 const clos = (u, v) => st.role === 'c' ? C(u, v, st.p[0], st.p[1]) : C(st.p[0], st.p[1], u, v);
 const panels = [mkPanel($('grid'), VIRR, clos, 1), mkPanel($('grid'), VIR, (u, v) => Nk(clos(u, v), st.k, st.N), 0)];
 const TT = {
-  c: [['Closeness C(x; c)', 'Mass of the ball around c that reaches x. Map over every x.'],
+  c: [['Forward closeness Clos(<i>X</i>, <i>c</i>), <i>X</i> ∼ <i>f<sub>X</sub></i>', 'Mass of the ball around c that reaches x. Map over every x.'],
       ['Probability N<sup>k:N</sup>(x; c)', 'Chance that x is among the k nearest neighbours of c. Map over every x.']],
-  x: [['Reverse closeness C(x; c)', 'Closeness of x as seen from each possible c. Map over every c.'],
+  x: [['Reverse closeness Clos(<i>x</i>, <i>C</i>), <i>C</i> ∼ <i>f<sub>X</sub></i>', 'Closeness of x as seen from each possible c. Map over every c.'],
       ['Reverse probability N<sup>k:N</sup>(x; c)', 'Chance that x is a k-neighbour of c. N times its mean is O(x).']]
 };
 const HINT1 = { c: 'The point is the reference c. Maps show how every x relates to it.',
