@@ -49,7 +49,7 @@ const Nk = (p, k, N) => binCdf(k - 1, N - 1, p);
 
 // ================= STATE / UI =================
 const $ = id => document.getElementById(id), W = 440, MG = 32, SQ = W - 2 * MG;  // canvas size, margin around the square, square side
-const st = { N: 1000, k: 30, p: [0.3, 0.2], q: [-0.5, -0.4], two: false, ox: [0.3, 0.2], role: 'x', res: 150, ores: 100, order: false, mode: 'explore' };
+const st = { N: 1000, k: 30, p: [0.3, 0.2], q: [-0.5, -0.4], two: false, ox: [0.3, 0.2], role: 'c', res: 150, ores: 100, order: false, mode: 'explore' };
 const fmt = v => (v === undefined || !isFinite(v)) ? '–' : v.toPrecision(3);
 const VIR = ['#440154', '#46327e', '#365c8d', '#277f8e', '#1fa187', '#4ac16d', '#9fda3a', '#fde725'];
 const MAG = ['#000004', '#251255', '#721f81', '#b63679', '#f1605d', '#fec287', '#fcfdbf'];

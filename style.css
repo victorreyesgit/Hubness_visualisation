@@ -87,3 +87,5 @@ canvas.diag{max-width:600px;margin:0 auto 10px;border-radius:10px;cursor:default
 .item .eq{padding:0;border:0;background:none}
 #hub .box{margin-bottom:14px}
 .pval{font-size:13px;color:var(--tx);margin-top:8px}
+.eq{overflow:visible;white-space:normal}
+.eq math{font-size:1em}
