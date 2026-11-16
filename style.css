@@ -86,3 +86,4 @@ canvas.diag{max-width:600px;margin:0 auto 10px;border-radius:10px;cursor:default
 .item .lab{font-size:13px;color:var(--mut);margin-bottom:4px}
 .item .eq{padding:0;border:0;background:none}
 #hub .box{margin-bottom:14px}
+.pval{font-size:13px;color:var(--tx);margin-top:8px}

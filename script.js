@@ -170,56 +170,67 @@ panels.forEach(p => {
 // ================= CDFs OF THE MAP VALUES =================
 const cdfP = [0, 1].map(() => {
   const el = document.createElement('div'); el.className = 'panel full';
-  el.innerHTML = '<h3></h3><div class="sub"></div><canvas class="wide" width="880" height="260"></canvas><div class="pval"></div>';
+  el.innerHTML = '<h3></h3><div class="sub"></div><canvas class="wide" width="880" height="280"></canvas><div class="pval"></div>';
   $('grid').appendChild(el); return el;
 });
 const CDF_T = {
-  c: [['CDF of closeness C(x; c) over x', 'Fraction of the square (every x) whose closeness to c is at most t.'],
-      ['CDF of N<sup>k:N</sup>(x; c) over x', 'Fraction of the square (every x) whose probability of being a k-neighbour of c is at most t.']],
-  x: [['CDF of reverse closeness C(x; c) over c', 'Fraction of the possible c whose closeness to x is at most t. The dashed diagonal is the identity F(t) = t.'],
-      ['CDF of reverse N<sup>k:N</sup>(x; c) over c', 'Fraction of the possible c whose probability that x is a k-neighbour is at most t. O(x) is N times its mean.']]
+  c: [['Closeness C(x; c) over x', 'Horizontal axis: proportion of the square (every x). Vertical axis: the value that this proportion stays below. Dashed guides: value k/N and proportion P(C < k/N).'],
+      ['N<sup>k:N</sup>(x; c) over x', 'Horizontal axis: proportion of the square (every x). Vertical axis: the probability value that this proportion stays below.']],
+  x: [['Reverse closeness C(x; c) over c', 'Horizontal axis: proportion of the possible c. Vertical axis: the closeness value that this proportion stays below. Dashed guides: value k/N and proportion P(C < k/N).'],
+      ['Reverse N<sup>k:N</sup>(x; c) over c', 'Horizontal axis: proportion of the possible c. Vertical axis: the probability value that this proportion stays below. O(x) is N times the mean of these values.']]
 };
 const makeCdf = a => { const n = a.length; return t => { let lo = 0, hi = n; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] <= t) lo = m + 1; else hi = m; } return lo / n; }; };
-function drawCdfPlot(i, F, colr, name, markT, ident) {
+// swap = false: horizontal value t, vertical fraction F(t). swap = true (reverse): horizontal proportion, vertical value.
+function drawCdfPlot(i, arr, colr, name, markT, ident, thr, swap) {
   const el = cdfP[i]; el.querySelector('h3').innerHTML = CDF_T[st.role][i][0]; el.querySelector('.sub').innerHTML = CDF_T[st.role][i][1];
-  const cv = el.querySelector('canvas'), g = cv.getContext('2d'), Wc = 880, Hc = 260, m = { l: 58, r: 18, t: 14, b: 44 }, pw = Wc - m.l - m.r, ph = Hc - m.t - m.b;
+  const F = makeCdf(arr), n = arr.length, Q = p => arr[Math.min(n - 1, Math.floor(p * n))];
+  const cv = el.querySelector('canvas'), g = cv.getContext('2d'), Wc = 880, Hc = 280, m = { l: 62, r: 18, t: 14, b: 46 }, pw = Wc - m.l - m.r, ph = Hc - m.t - m.b;
   const css = getComputedStyle(document.documentElement), col = k => css.getPropertyValue(k).trim();
-  const mut = col('--mut') || '#667186', line = col('--line') || '#e1e6ee', tx = col('--tx') || '#111';
-  const PX = t => m.l + t * pw, PY = f => m.t + (1 - f) * ph;
+  const mut = col('--mut') || '#667186', line = col('--line') || '#e1e6ee', tx = col('--tx') || '#111', red = '#e5253d';
+  const P2 = (t, f) => swap ? [m.l + f * pw, m.t + (1 - t) * ph] : [m.l + t * pw, m.t + (1 - f) * ph];   // (value, proportion) -> canvas
+  const seg = (p, q, colr, dash) => { g.setLineDash(dash ? [5, 4] : []); g.strokeStyle = colr; g.lineWidth = 1.5; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); g.setLineDash([]); };
+  const dot = (p, colr) => { g.beginPath(); g.arc(p[0], p[1], 4.5, 0, 7); g.fillStyle = colr; g.fill(); g.lineWidth = 2; g.strokeStyle = '#fff'; g.stroke(); };
   g.clearRect(0, 0, Wc, Hc); g.font = '13px system-ui,sans-serif'; g.lineWidth = 1;
   for (let k = 0; k <= 4; k++) {
-    g.strokeStyle = line; g.beginPath(); g.moveTo(m.l, PY(k / 4)); g.lineTo(m.l + pw, PY(k / 4)); g.moveTo(PX(k / 4), m.t); g.lineTo(PX(k / 4), m.t + ph); g.stroke();
-    g.fillStyle = mut; g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(k / 4, m.l - 8, PY(k / 4));
-    g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(k / 4, PX(k / 4), m.t + ph + 8);
+    g.strokeStyle = line; g.beginPath(); g.moveTo(m.l, m.t + (1 - k / 4) * ph); g.lineTo(m.l + pw, m.t + (1 - k / 4) * ph); g.moveTo(m.l + k / 4 * pw, m.t); g.lineTo(m.l + k / 4 * pw, m.t + ph); g.stroke();
+    g.fillStyle = mut; g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(k / 4, m.l - 8, m.t + (1 - k / 4) * ph);
+    g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(k / 4, m.l + k / 4 * pw, m.t + ph + 8);
   }
-  g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillText('value t', m.l + pw / 2, Hc - 8);
-  g.save(); g.translate(14, m.t + ph / 2); g.rotate(-Math.PI / 2); g.fillText('F(t) = fraction ≤ t', 0, 0); g.restore();
-  if (ident) { g.setLineDash([6, 5]); g.strokeStyle = mut; g.lineWidth = 1.5; g.beginPath(); g.moveTo(PX(0), PY(0)); g.lineTo(PX(1), PY(1)); g.stroke(); g.setLineDash([]); }
-  const K = 400; g.beginPath(); for (let k = 0; k <= K; k++) g[k ? 'lineTo' : 'moveTo'](PX(k / K), PY(F(k / K)));
+  g.fillStyle = mut; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  g.fillText(swap ? 'proportion of points' : 'value t', m.l + pw / 2, Hc - 8);
+  g.save(); g.translate(14, m.t + ph / 2); g.rotate(-Math.PI / 2); g.fillText(swap ? 'value t' : 'F(t) = fraction ≤ t', 0, 0); g.restore();
+  if (ident) { g.setLineDash([6, 5]); g.strokeStyle = mut; g.lineWidth = 1.5; g.beginPath(); g.moveTo(...P2(0, 0)); g.lineTo(...P2(1, 1)); g.stroke(); g.setLineDash([]); }
+  const K = 400; g.beginPath();
+  for (let k = 0; k <= K; k++) { const q = k / K, p = swap ? P2(Q(q), q) : P2(q, F(q)); g[k ? 'lineTo' : 'moveTo'](p[0], p[1]); }
   g.strokeStyle = colr; g.lineWidth = 2.5; g.stroke();
-  if (markT !== undefined) {                              // current pair (x, c)
-    const f = F(markT);
-    g.setLineDash([5, 4]); g.strokeStyle = '#e5253d'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(PX(markT), PY(0)); g.lineTo(PX(markT), PY(f)); g.lineTo(PX(0), PY(f)); g.stroke(); g.setLineDash([]);
-    g.beginPath(); g.arc(PX(markT), PY(f), 4.5, 0, 7); g.fillStyle = colr; g.fill(); g.lineWidth = 2; g.strokeStyle = '#fff'; g.stroke();
-    g.fillStyle = tx; g.textAlign = markT > .6 ? 'right' : 'left'; g.textBaseline = 'bottom';
-    g.fillText(`${name} = ${markT.toFixed(3)} → F = ${f.toFixed(3)}`, PX(markT) + (markT > .6 ? -8 : 8), PY(f) - 6);
+  if (thr !== undefined) {                                   // reference: value k/N and proportion P(C < k/N)
+    const f = F(thr), A = P2(thr, f);
+    seg(P2(thr, 0), A, mut, true); seg(P2(0, f), A, mut, true); dot(A, mut);
+    g.fillStyle = tx; g.textAlign = A[0] > m.l + pw * .6 ? 'right' : 'left'; g.textBaseline = 'top';
+    g.fillText(`k/N = ${+thr.toPrecision(3)}, P = ${f.toFixed(3)}`, A[0] + (A[0] > m.l + pw * .6 ? -8 : 8), A[1] + 8);
   }
-  const items = [[name, colr, false]]; if (ident) items.push(['identity F(t) = t', mut, true]);
-  const ly = m.t + 16, lx = m.l + 12;
-  g.textAlign = 'left'; g.textBaseline = 'middle';
-  items.forEach(([t, cl, dash], k) => { const y = ly + k * 20; g.setLineDash(dash ? [6, 5] : []); g.strokeStyle = cl; g.lineWidth = 2.5; g.beginPath(); g.moveTo(lx, y); g.lineTo(lx + 24, y); g.stroke(); g.setLineDash([]); g.fillStyle = tx; g.fillText(t, lx + 32, y); });
+  if (markT !== undefined) {                                 // current pair (x, c)
+    const f = F(markT), A = P2(markT, f);
+    seg(P2(markT, 0), A, red, true); seg(P2(0, f), A, red, true); dot(A, red);
+    g.fillStyle = tx; g.textAlign = A[0] > m.l + pw * .6 ? 'right' : 'left'; g.textBaseline = 'bottom';
+    g.fillText(`${name} = ${markT.toFixed(3)} → F = ${f.toFixed(3)}`, A[0] + (A[0] > m.l + pw * .6 ? -8 : 8), A[1] - 8);
+  }
+  const items = [[name, colr, false]]; if (ident) items.push(['identity', mut, true]);
+  items.forEach(([t, cl, dash], k) => {
+    const y = m.t + 16 + k * 20, x = m.l + 12; g.setLineDash(dash ? [6, 5] : []); g.strokeStyle = cl; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + 24, y); g.stroke(); g.setLineDash([]);
+    g.fillStyle = tx; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(t, x + 32, y);
+  });
 }
 function drawCdf() {
   const xp = xPt(), cp = cPt(), cv = st.two ? C(xp[0], xp[1], cp[0], cp[1]) : undefined, nv = st.two ? Nk(cv, st.k, st.N) : undefined;
   const css = getComputedStyle(document.documentElement), C1 = css.getPropertyValue('--ac').trim() || '#21908d', C2 = '#7e57c2';
-  const cArr = Float32Array.from(panels[0].v, t => st.order ? (t - 1) / (st.N - 1) : t).sort();   // raw closeness, even in the order view
-  const F1 = makeCdf(cArr), F2 = makeCdf(Float32Array.from(panels[1].v).sort());
-  drawCdfPlot(0, F1, C1, 'closeness', cv, st.role === 'x');
-  drawCdfPlot(1, F2, C2, 'N k:N', nv, false);
-  // probabilities under each plot: P(C < k/N) and P(N^{k:N} < 0.5)
-  const thr = st.k / st.N;
-  cdfP[0].querySelector('.pval').innerHTML = `P(<i>C</i> &lt; <i>k</i>/<i>N</i> = ${+thr.toPrecision(3)}) = <b>${F1(thr).toFixed(3)}</b>`;
-  cdfP[1].querySelector('.pval').innerHTML = `P(<i>N</i><sup><i>k</i>:<i>N</i></sup> &gt; 0.5) = <b>${(1 - F2(0.5)).toFixed(3)}</b>`;
+  const cArr = Float32Array.from(panels[0].v, t => st.order ? (t - 1) / (st.N - 1) : t).sort(), nArr = Float32Array.from(panels[1].v).sort();
+  const rev = st.role === 'x', kN = st.k / st.N;
+  drawCdfPlot(0, cArr, C1, 'closeness', cv, rev, kN, true);
+  drawCdfPlot(1, nArr, C2, 'N k:N', nv, false, undefined, true);
+  cdfP[0].querySelector('.pval').innerHTML = `P(<i>C</i> &lt; <i>k</i>/<i>N</i> = ${+kN.toPrecision(3)}) = <b>${makeCdf(cArr)(kN).toFixed(3)}</b>`;
+  cdfP[1].querySelector('.pval').innerHTML = `P(<i>N</i><sup><i>k</i>:<i>N</i></sup> &gt; 0.5) = <b>${(1 - makeCdf(nArr)(0.5)).toFixed(3)}</b>`;
 }
 
 // ================= k-OCCURRENCE MAP (all x) =================
